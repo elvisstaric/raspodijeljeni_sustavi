@@ -1,4 +1,4 @@
-SharedProjects; Elvis Starić
+DBtester; Elvis Starić
 
 Fakultet informatike u Puli https://fipu.unipu.hr/
 
