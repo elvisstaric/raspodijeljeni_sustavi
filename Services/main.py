@@ -7,7 +7,7 @@ async def main():
         test_duration = int(input("Unesite trajanje testa: "))
         interval = int(input("Unesite interval ispisa: "))
         params={"url":url, "clients":clients, "test_duration":test_duration, "interval":interval}
-        url_rez=await session.post("http://localhost:8080/post_params", json=params)
+        url_rez=await session.post("http://localhost:8081/post_params", json=params)
         print(await url_rez.text())
 
         

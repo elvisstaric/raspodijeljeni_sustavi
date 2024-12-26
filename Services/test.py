@@ -3,19 +3,21 @@ import time
 from random import randint, choice
 import asyncio, aiohttp
 
-from multiprocessing import Process, Value, Lock
+from multiprocessing import Process, Value, Lock, Manager
 
 async def get_params():
     async with aiohttp.ClientSession() as session:
-        get_settings=await session.get("http://localhost:8080/values")
-    return await get_settings.json()
+        get_settings=await session.get("http://localhost:8081/values")
+        settings = await get_settings.json()
+    return settings.get("settings")
 
 
 
 async def get_routes():
     async with aiohttp.ClientSession() as session:
-        get_settings=await session.get("http://localhost:8081/test")
-    return await get_settings.json()
+        get_settings=await session.get("http://localhost:8082/test")
+        tests=await get_settings.json()
+    return tests.get("tests")
 
 async def run_test(test_select, url):
     
@@ -71,14 +73,16 @@ def test(lat, cnt, run, url, tests):
                 with lat.get_lock():
                     if(lat.value<latency):
                         lat.value = latency
-            
-def test_controler(lat,cnt, run, start, gl_start, duration, interval):
+
+
+def test_controler(lat,cnt, run, start, gl_start, duration, interval, results):
         while run.value:
             now = time.time()
             if now - gl_start >= duration:
                 run.value = False
             if now - start.value >= interval:
                 print("Responses:", cnt.value, "lat:", lat.value,)
+                results.append({"time": now-gl_start, "Responses:": cnt.value, "lat:": lat.value,})
                 with cnt.get_lock():
                     cnt.value = 0
                 with lat.get_lock():
@@ -102,15 +106,19 @@ async def main():
         processes = []
         start.value = gl_start = time.time()
         run = Value('b', True)
+        results = Manager().list()
 
         for i in range(clients):
             process = Process(target=test, args=(lat,cnt, run, url, tests))
             process.start()
             processes.append(process)
-        process = Process(target=test_controler, args=(lat,cnt, run, start, gl_start, duration, interval))
+        process = Process(target=test_controler, args=(lat,cnt, run, start, gl_start, duration, interval, results))
         process.start()
         processes.append(process)
 
         for process in processes:
             process.join()
+        print(results)
+        
+        
 asyncio.run(main())

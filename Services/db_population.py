@@ -1,11 +1,19 @@
 import sqlalchemy
 import pandas as pd
 from aiohttp import web
-from aiohttp.web import AppRunner
-import asyncio, aiohttp
+from fastapi import FastAPI
+from pydantic import BaseModel
 
-async def post_db_population(req):
-    data=await req.json()
+class Data(BaseModel):
+    conn_str: str
+    path:str
+    relations: list
+
+app=FastAPI()
+
+@app.post('/db_population')
+async def post_db_population(data:Data):
+    data=data.model_dump()
     conn_str=data.get("conn_str")
     
     PATH = data.get("path")
@@ -40,30 +48,6 @@ async def post_db_population(req):
         rez="Populacija baze uspjesna!"
     except Exception as e:
         rez=e
-    return web.json_response(rez)
-app = web.Application()
-app.router.add_post('/db_population', post_db_population)
+    return {"message":rez}
 
-async def start_server():
-    runner = AppRunner(app)
-    await runner.setup()
-    site = web.TCPSite(runner, 'localhost', 8080)
-    await site.start()
-    print("Poslužitelj sluša na http://localhost:8080")
-
-async def main():
-    await start_server() 
-    async with aiohttp.ClientSession() as session: 
-
-        conn_str=input("Unesite connection string za bazu: ")
-        PATH = input("Unesite lokaciju CSV datoteke: ")
-        relation_nr = int(input("Unesite broj relacija: "))
-        relations = [{"name": input(f"Naziv relacije {i+1}: "), "atributes":input(f"Atributi relacije {i+1}: ").split(","),
-                "fk": input(f"Relacija stranog kljuca relacije {i+1}(ako nema nemojet unijeti nista) : " ) or None,
-                "uk": input(f"Unique key u relaciji stranog kljuca {i+1}(ako nema nemojet unijeti nista) : " ).split(",")} for i in range(relation_nr)]
-        data={"conn_str":conn_str, "path":PATH, "relations":relations}
-
-        population_rez=await session.post("http://localhost:8080/db_population", json=data)
-        print(await population_rez.text())
-asyncio.run(main()) 
 

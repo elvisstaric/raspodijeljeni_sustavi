@@ -1,11 +1,21 @@
-from aiohttp import web
-from aiohttp.web import AppRunner
-import asyncio, aiohttp
+import aiohttp
+
+from fastapi import FastAPI
+from pydantic import BaseModel, ValidationError
+
+class Settings(BaseModel):
+    url:str 
+    clients: int 
+    test_duration:int 
+    interval:int 
+
+app=FastAPI()
 
 test_settings={}
 
-async def post_params(req):
-    data=await req.json()
+@app.post('/post_params')
+async def post_params(settings: Settings):
+    data= settings.model_dump()
     new_url=data.get("url")
     try:
         async with aiohttp.ClientSession() as session: 
@@ -15,13 +25,9 @@ async def post_params(req):
     except:
         test="Stranica ne postoji!"
         test_settings.clear()
-    return web.json_response(test)
+    return {test}
 
-async def get_handler(req):
-    return web.json_response(test_settings)
+@app.get("/values")
+async def get_handler():
+    return {"settings":test_settings}
 
-if __name__=="__main__":
-    app = web.Application()
-    app.router.add_post('/post_params', post_params)
-    app.router.add_get("/values", get_handler)
-    web.run_app(app)

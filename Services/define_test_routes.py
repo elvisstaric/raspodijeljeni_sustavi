@@ -1,19 +1,25 @@
-from aiohttp import web
-from aiohttp.web import AppRunner
-import asyncio, aiohttp
+from typing import Literal, Optional
+
+from fastapi import FastAPI
+from pydantic import BaseModel
 
 tests=[]
+class Test(BaseModel):
+    method:Literal["get", "post", "put", "patch", "delete"]
+    endpoint: str 
+    payload: Optional[dict]=None
 
-async def post_test(req):
-    data=await req.json()
+
+
+app=FastAPI()
+
+@app.post("/test")
+async def post_test(test:Test):
+    data=test.model_dump()
     tests.append(data)
-    return web.json_response("Added")
+    return ("Added")
 
-async def get_tests(req):
-    return web.json_response(tests)
+@app.get("/test")
+async def get_tests():
+    return {"tests":tests}
 
-if __name__=="__main__":
-    app = web.Application()
-    app.router.add_post('/test', post_test)
-    app.router.add_get("/test", get_tests)
-    web.run_app(app, port=8081)
