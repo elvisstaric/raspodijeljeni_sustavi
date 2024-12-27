@@ -3,21 +3,19 @@ import time
 from random import randint, choice
 import asyncio, aiohttp
 
-from multiprocessing import Process, Value, Lock, Manager
+from fastapi import FastAPI
+from pydantic import BaseModel
 
-async def get_params():
-    async with aiohttp.ClientSession() as session:
-        get_settings=await session.get("http://localhost:8081/values")
-        settings = await get_settings.json()
-    return settings.get("settings")
+tests=[]
+class TestParams(BaseModel):
+    lat:float 
+    cnt:int 
+    run:bool
+    url:str
+    tests:list
+    duration:int
 
-
-
-async def get_routes():
-    async with aiohttp.ClientSession() as session:
-        get_settings=await session.get("http://localhost:8082/test")
-        tests=await get_settings.json()
-    return tests.get("tests")
+app = FastAPI()
 
 async def run_test(test_select, url):
     
@@ -57,68 +55,32 @@ async def run_test(test_select, url):
     
         
 
+@app.post("/post_test")
+async def test(testParams:TestParams):
+        params=testParams.model_dump()
 
-def test(lat, cnt, run, url, tests):
-        max_lat=0
-        now = time.time()
-        
-        while run.value:
-            test_select = choice(tests)
-            
-            res_stat= asyncio.run(run_test(test_select, url))
-            if res_stat[0]:
-                with cnt.get_lock():
-                    cnt.value += 1
-                latency=res_stat[1]
-                with lat.get_lock():
-                    if(lat.value<latency):
-                        lat.value = latency
+        lat=params.get("lat") 
+        cnt=params.get("cnt") 
+        run=params.get("run")
+        url=params.get("url")
+        tests=params.get("tests")
+        duration=params.get("duration")
 
+        lock = asyncio.Lock()
+        start=time.time()
+        while run:
+            running= time.time()
+            if running - start >= duration:
+                run = False
+            else:
+                test_select = choice(tests)
+                
+                res_stat= await run_test(test_select, url)
+                if res_stat[0]:
+                    async with lock:
+                        cnt += 1
+                        latency=res_stat[1]
+                        if(lat<latency):
+                            lat = latency
+        return {"cnt": cnt, "lat":lat}
 
-def test_controler(lat,cnt, run, start, gl_start, duration, interval, results):
-        while run.value:
-            now = time.time()
-            if now - gl_start >= duration:
-                run.value = False
-            if now - start.value >= interval:
-                print("Responses:", cnt.value, "lat:", lat.value,)
-                results.append({"time": now-gl_start, "Responses:": cnt.value, "lat:": lat.value,})
-                with cnt.get_lock():
-                    cnt.value = 0
-                with lat.get_lock():
-                    lat.value=0
-                with start.get_lock():
-                    start.value = now
-
-async def main():
-    params = await get_params()
-    url=params.get("url")
-    clients=params.get("clients")
-    duration=params.get("test_duration")+1
-    interval=params.get("interval")
-
-    tests = await get_routes()
-
-    if __name__ == '__main__':
-        cnt = Value('i', 0)
-        start = Value('d', 0.0)
-        lat = Value("d", 0.0)
-        processes = []
-        start.value = gl_start = time.time()
-        run = Value('b', True)
-        results = Manager().list()
-
-        for i in range(clients):
-            process = Process(target=test, args=(lat,cnt, run, url, tests))
-            process.start()
-            processes.append(process)
-        process = Process(target=test_controler, args=(lat,cnt, run, start, gl_start, duration, interval, results))
-        process.start()
-        processes.append(process)
-
-        for process in processes:
-            process.join()
-        print(results)
-        
-        
-asyncio.run(main())
