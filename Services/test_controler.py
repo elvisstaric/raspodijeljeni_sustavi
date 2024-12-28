@@ -1,6 +1,9 @@
 import time
 import asyncio, aiohttp
+from fastapi import FastAPI
 
+
+app = FastAPI() 
 
 async def get_params():
     async with aiohttp.ClientSession() as session:
@@ -35,7 +38,7 @@ async def test_controler(lat,cnt, run, start, gl_start, duration, interval, clie
                     if max_lat<result.get("lat"):
                         max_lat=result.get("lat")
                 print("Responses:", cnt_all, "lat:", max_lat,)
-                results_all.append({"time": now-gl_start, "Responses:": cnt_all, "lat:": max_lat,})
+                results_all.append({"time": int(now-gl_start), "Responses:": cnt_all, "lat:": max_lat,})
                 cnt_all = 0
                 max_lat=0
                 start = now
@@ -47,23 +50,24 @@ async def test(lat,cnt, run, url, tests, duration):
         res=await session.post("http://localhost:8083/post_test", json=params)
         return await res.json()
 
-async def main():
+@app.get("/start_test")
+async def testRun():
     params = await get_params()
     url=params.get("url")
     clients=params.get("clients")
-    duration=params.get("test_duration")+1
+    duration=params.get("test_duration")
+    duration+=1
     interval=params.get("interval")
 
     tests = await get_routes()
 
-    if __name__ == '__main__':
-        cnt = 0
-        start = 0
-        lat = 0
-        start = gl_start = time.time()
-        run = True
+    
+    cnt = 0
+    start = 0
+    lat = 0
+    start = gl_start = time.time()
+    run = True
 
-        res= await test_controler(lat,cnt, run, start, gl_start, duration, interval, clients, url, tests)
-        print(res)
+    res= await test_controler(lat,cnt, run, start, gl_start, duration, interval, clients, url, tests)
+    return {"results":res}
         
-asyncio.run(main())
